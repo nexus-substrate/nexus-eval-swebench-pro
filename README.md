@@ -2,7 +2,7 @@
 
 SWE-bench **Pro** evaluation harness for [nexus-agents](https://github.com/williamzujkowski/nexus-agents) — implements the `BenchmarkAdapter` contract from nexus-agents ≥ 2.33.1.
 
-> **Status**: v0.1 scaffold. The adapter compiles, smoke tests pass, and the type contract is locked. Real dataset loader, runner, and Docker eval ship in [tracked follow-ups](#implementation-roadmap).
+> **Status**: v0.2 model-only baseline. Real HuggingFace dataset loader, Pro-specific prompt + patch+prefix extractor, and IModelAdapter-driven runner all wired up. Docker eval (test-based pass/fail) is the v0.4 follow-up.
 
 ## Why Pro
 
@@ -24,38 +24,57 @@ npm install nexus-eval-swebench-pro nexus-agents
 
 `nexus-agents` is a peer dependency.
 
-## Quick start (v0.1 scaffold — uses stub data)
+## Quick start (CLI)
 
 ```sh
-# Smoke test the scaffold
-npx nexus-eval-swebench-pro
+# Set the OpenAI-compat endpoint
+export OPENAI_API_KEY=sk-...
+export OPENAI_BASE_URL=https://your-gateway/v1   # optional
+export MODEL_ID=anthropic/claude-sonnet-4-6      # optional
 
-# JSON summary
-npx nexus-eval-swebench-pro --json
+# Smoke test against the bundled 4-instance fixture (no network)
+npx nexus-eval-swebench-pro --dataset fixture
+
+# Real HuggingFace pull, 5 instances, 3-way parallel
+npx nexus-eval-swebench-pro --limit 5 --concurrency 3
+
+# Filter to Go + Python only
+npx nexus-eval-swebench-pro --languages go,python --limit 10
+
+# JSON summary for piping
+npx nexus-eval-swebench-pro --json --limit 5 > run.json
 ```
-
-This currently exercises the type contract end-to-end against a single stub instance. Real Pro instances + real evaluation arrive in v0.2 (see [Implementation roadmap](#implementation-roadmap)).
 
 ## Library usage
 
 ```ts
-import { runBenchmark } from 'nexus-agents';
+import { runBenchmark, createOpenAIAdapter } from 'nexus-agents';
 import { SweBenchProAdapter } from 'nexus-eval-swebench-pro';
 
-const adapter = new SweBenchProAdapter({ dataset: 'huggingface' });
+const modelAdapter = createOpenAIAdapter({
+  apiKey: process.env.OPENAI_API_KEY!,
+  modelId: 'gpt-4o',
+});
+
+const adapter = new SweBenchProAdapter(modelAdapter, { dataset: 'huggingface' });
 const summary = await runBenchmark(adapter, {}, {
   concurrency: 4,
   limit: 25, // start small — full Pro is 731 instances
 });
 
-console.log(`Resolved ${summary.passed}/${summary.total} (${(summary.passRate * 100).toFixed(1)}%)`);
+console.log(
+  `Generated ${summary.passed}/${summary.total} non-empty patches ` +
+    `(${(summary.passRate * 100).toFixed(1)}%)`
+);
 
-// Per-language breakdown — Pro's most interesting signal
+// Per-language breakdown — Pro's headline signal
 const meta = summary.metadata as { byLanguage: Record<string, { total: number; passed: number; passRate: number }> };
 for (const [lang, stats] of Object.entries(meta.byLanguage)) {
   console.log(`  ${lang}: ${stats.passed}/${stats.total} (${(stats.passRate * 100).toFixed(1)}%)`);
 }
 ```
+
+Operators with their own `IModelAdapter` (Claude API, Ollama, anything implementing the contract) can substitute it for `createOpenAIAdapter` without changing anything else.
 
 ## What this harness will do (full implementation)
 
@@ -68,12 +87,16 @@ for (const [lang, stats] of Object.entries(meta.byLanguage)) {
 
 ## Implementation roadmap
 
-Tracked in this repo's issues (filed alongside this v0.1 scaffold):
+### Shipped in v0.2
 
-- **[#2](https://github.com/williamzujkowski/nexus-eval-swebench-pro/issues/2) — Dataset loader** for the Pro format. HuggingFace fetcher + `.jsonl` reader + bundled fixture path. Handles the new `requirements`, `interface`, `repo_language` fields and the `languages` filter.
-- **[#3](https://github.com/williamzujkowski/nexus-eval-swebench-pro/issues/3) — Solver runner + prompt template** (deliverables 2 + 3 from the original scope). Composes the Pro-specific prompt that surfaces `requirements` + `interface`, clones the repo at `base_commit`, invokes the agent, captures patch + prefix.
-- **[#4](https://github.com/williamzujkowski/nexus-eval-swebench-pro/issues/4) — Docker eval integration** with `scaleapi/SWE-bench_Pro-os` and `--use_local_docker`. Per-instance Docker images, concurrency-safe, prepull support.
-- **[#5](https://github.com/williamzujkowski/nexus-eval-swebench-pro/issues/5) — End-to-end smoke** against ≤5 real instances spanning all 4 languages, validating the full pipeline.
+- **[#2](https://github.com/williamzujkowski/nexus-eval-swebench-pro/issues/2) — Dataset loader** ✓ Real HuggingFace fetch from `ScaleAI/SWE-bench_Pro` with on-disk cache, plus `.jsonl` and bundled-fixture sources. Handles the `requirements` / `interface` / `repo_language` fields and the languages filter.
+- **[#3](https://github.com/williamzujkowski/nexus-eval-swebench-pro/issues/3) — Solver runner + Pro prompt** ✓ Model-only baseline: composes the Pro-specific prompt (problem + requirements + interface + language), invokes the configured `IModelAdapter`, parses out a unified-diff patch + prefix.
+
+### Still to do
+
+- **[#4](https://github.com/williamzujkowski/nexus-eval-swebench-pro/issues/4) — Docker eval integration** with `scaleapi/SWE-bench_Pro-os`. Without it, the adapter's pass/fail = "model produced a non-empty patch". Run the upstream Docker harness on the emitted predictions for true test-based resolution.
+- **[#5](https://github.com/williamzujkowski/nexus-eval-swebench-pro/issues/5) — End-to-end smoke** against ≤5 real instances spanning all 4 languages.
+- **v0.3 (TBD)** — agentic flow via `ICliAdapter` against a cloned workspace (substantially better patch quality than the model-only baseline).
 
 Cross-repo tracking lives at [nexus-agents #2513](https://github.com/williamzujkowski/nexus-agents/issues/2513) so anyone searching the main repo for "SWE-bench Pro" lands at this repo.
 
