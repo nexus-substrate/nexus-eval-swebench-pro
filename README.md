@@ -70,11 +70,10 @@ for (const [lang, stats] of Object.entries(meta.byLanguage)) {
 
 Tracked in this repo's issues (filed alongside this v0.1 scaffold):
 
-1. **#1 — Dataset loader** for the Pro format. HuggingFace fetcher + `.jsonl` reader. Handles the new `requirements`, `interface`, `repo_language` fields.
-2. **#2 — Solver runner** that composes the Pro-specific prompt template, clones the repo at `base_commit`, invokes the agent, and captures patch + prefix.
-3. **#3 — Prompt template** surfacing requirements + interface contextually for multi-language solvers.
-4. **#4 — Docker eval integration** with `scaleapi/SWE-bench_Pro-os` and `--use_local_docker`. Per-instance Docker images.
-5. **#5 — End-to-end smoke** against ≤5 real instances to validate the full pipeline.
+- **[#2](https://github.com/williamzujkowski/nexus-eval-swebench-pro/issues/2) — Dataset loader** for the Pro format. HuggingFace fetcher + `.jsonl` reader + bundled fixture path. Handles the new `requirements`, `interface`, `repo_language` fields and the `languages` filter.
+- **[#3](https://github.com/williamzujkowski/nexus-eval-swebench-pro/issues/3) — Solver runner + prompt template** (deliverables 2 + 3 from the original scope). Composes the Pro-specific prompt that surfaces `requirements` + `interface`, clones the repo at `base_commit`, invokes the agent, captures patch + prefix.
+- **[#4](https://github.com/williamzujkowski/nexus-eval-swebench-pro/issues/4) — Docker eval integration** with `scaleapi/SWE-bench_Pro-os` and `--use_local_docker`. Per-instance Docker images, concurrency-safe, prepull support.
+- **[#5](https://github.com/williamzujkowski/nexus-eval-swebench-pro/issues/5) — End-to-end smoke** against ≤5 real instances spanning all 4 languages, validating the full pipeline.
 
 Cross-repo tracking lives at [nexus-agents #2513](https://github.com/williamzujkowski/nexus-agents/issues/2513) so anyone searching the main repo for "SWE-bench Pro" lands at this repo.
 
