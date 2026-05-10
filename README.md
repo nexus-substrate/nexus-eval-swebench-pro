@@ -1,36 +1,86 @@
-# nexus-eval-template
+# nexus-eval-swebench-pro
 
-Scaffold for building a new nexus-agents evaluation / benchmark harness.
+SWE-bench **Pro** evaluation harness for [nexus-agents](https://github.com/williamzujkowski/nexus-agents) — implements the `BenchmarkAdapter` contract from nexus-agents ≥ 2.33.1.
 
-Copy this repo, implement the adapter methods against your benchmark, publish as `nexus-eval-<name>`. Any benchmark you can express as `load instances → produce prediction → evaluate verdict` fits.
+> **Status**: v0.1 scaffold. The adapter compiles, smoke tests pass, and the type contract is locked. Real dataset loader, runner, and Docker eval ship in [tracked follow-ups](#implementation-roadmap).
 
-## What you get
+## Why Pro
 
-- `src/adapter.ts` — `BenchmarkAdapter` stub with all 4 required methods and inline "replace this" comments
-- `src/cli.ts` — CLI entry point that invokes `runBenchmark()` from nexus-agents
-- `src/index.ts` — library export so your adapter can be composed by other tools
-- `src/adapter.test.ts` — smoke tests proving the scaffold runs
-- `tsconfig.json`, `package.json` — TypeScript strict, vitest, Node 22+
-- MIT license, peer dependency on `nexus-agents >= 2.33.0`
+OpenAI and Anthropic both publicly signal that **SWE-bench Verified is largely contaminated and topped out** — top systems on Verified now cluster in the high 70s, where small differences are within noise. SWE-bench Pro is the next target:
 
-## Quick start
+- **731 instances** across **11 real-world repos** (Ansible, OpenLibrary, Teleport, Element, NodeBB, …)
+- **Multi-language**: Python, JavaScript, TypeScript, Go (Verified is Python-only)
+- **Top systems score ~23%** — meaningful differentiation across current state-of-the-art
+- **Newer dataset** with stronger contamination resistance than Verified
+- **Different prediction format** (`{instance_id, patch, prefix}`) and a different Docker eval harness (`scaleapi/SWE-bench_Pro-os`)
+
+This repo is the dedicated harness for running Pro evaluations through nexus-agents' orchestration. Per the [nexus-agents harness-extraction policy](https://github.com/williamzujkowski/nexus-agents/issues/2514) (originally [#1960](https://github.com/williamzujkowski/nexus-agents/issues/1960)), benchmarks live in standalone `nexus-eval-*` repos so they can evolve independently of the core.
+
+## Install
 
 ```sh
-# 1. Copy this repo
-gh repo create yourname/nexus-eval-<bench> --template williamzujkowski/nexus-eval-template --public
-
-# 2. Clone + install
-gh repo clone yourname/nexus-eval-<bench>
-cd nexus-eval-<bench>
-npm install
-
-# 3. Sanity check — the template tests pass out of the box
-npm test
+npm install nexus-eval-swebench-pro nexus-agents
 ```
+
+`nexus-agents` is a peer dependency.
+
+## Quick start (v0.1 scaffold — uses stub data)
+
+```sh
+# Smoke test the scaffold
+npx nexus-eval-swebench-pro
+
+# JSON summary
+npx nexus-eval-swebench-pro --json
+```
+
+This currently exercises the type contract end-to-end against a single stub instance. Real Pro instances + real evaluation arrive in v0.2 (see [Implementation roadmap](#implementation-roadmap)).
+
+## Library usage
+
+```ts
+import { runBenchmark } from 'nexus-agents';
+import { SweBenchProAdapter } from 'nexus-eval-swebench-pro';
+
+const adapter = new SweBenchProAdapter({ dataset: 'huggingface' });
+const summary = await runBenchmark(adapter, {}, {
+  concurrency: 4,
+  limit: 25, // start small — full Pro is 731 instances
+});
+
+console.log(`Resolved ${summary.passed}/${summary.total} (${(summary.passRate * 100).toFixed(1)}%)`);
+
+// Per-language breakdown — Pro's most interesting signal
+const meta = summary.metadata as { byLanguage: Record<string, { total: number; passed: number; passRate: number }> };
+for (const [lang, stats] of Object.entries(meta.byLanguage)) {
+  console.log(`  ${lang}: ${stats.passed}/${stats.total} (${(stats.passRate * 100).toFixed(1)}%)`);
+}
+```
+
+## What this harness will do (full implementation)
+
+- Load Pro instances from the [`ScaleAI/SWE-bench_Pro` HuggingFace dataset](https://huggingface.co/datasets/ScaleAI/SWE-bench_Pro), or from a local `.jsonl` fixture.
+- Compose prompts that surface Pro's `requirements` + `interface` fields (not present in Lite/Verified) so the solver sees the API contract it must satisfy.
+- Invoke the configured agent executor inside a workspace cloned at each instance's `base_commit`.
+- Capture the resulting patch + prefix in Pro's required `{instance_id, patch, prefix}` shape.
+- Run the resulting predictions against the [`scaleapi/SWE-bench_Pro-os` Docker harness](https://github.com/scaleapi/SWE-bench_Pro-os) with `--use_local_docker`.
+- Surface per-language pass-rates in the summary so multi-language differentials are visible (the headline Pro signal).
+
+## Implementation roadmap
+
+Tracked in this repo's issues (filed alongside this v0.1 scaffold):
+
+1. **#1 — Dataset loader** for the Pro format. HuggingFace fetcher + `.jsonl` reader. Handles the new `requirements`, `interface`, `repo_language` fields.
+2. **#2 — Solver runner** that composes the Pro-specific prompt template, clones the repo at `base_commit`, invokes the agent, and captures patch + prefix.
+3. **#3 — Prompt template** surfacing requirements + interface contextually for multi-language solvers.
+4. **#4 — Docker eval integration** with `scaleapi/SWE-bench_Pro-os` and `--use_local_docker`. Per-instance Docker images.
+5. **#5 — End-to-end smoke** against ≤5 real instances to validate the full pipeline.
+
+Cross-repo tracking lives at [nexus-agents #2513](https://github.com/williamzujkowski/nexus-agents/issues/2513) so anyone searching the main repo for "SWE-bench Pro" lands at this repo.
 
 ## The contract
 
-Every `nexus-eval-*` package implements one interface from `nexus-agents`:
+`BenchmarkAdapter` from nexus-agents:
 
 ```ts
 interface BenchmarkAdapter<TInstance, TPrediction, TEvalResult> {
@@ -44,34 +94,16 @@ interface BenchmarkAdapter<TInstance, TPrediction, TEvalResult> {
 }
 ```
 
-The orchestrator (`runBenchmark` in nexus-agents) handles concurrency, timeouts, progress, and partial failure for you — you don't reimplement the harness.
+The orchestrator (`runBenchmark` in nexus-agents) handles concurrency, timeouts, progress, and partial failure — this repo doesn't reimplement the harness.
 
-## Implementation steps
+## Cost notes
 
-1. **Rename** `nexus-eval-BENCHMARK` to your benchmark name in `package.json` (name, bin, description).
-2. **Replace `BenchmarkInstance` / `BenchmarkPrediction` / `BenchmarkEvalResult`** in `src/adapter.ts` with your benchmark's actual shapes.
-3. **Implement `loadInstances`** — read your dataset from disk or fetch from an API.
-4. **Implement `runInstance`** — call your solver (usually a CLI subprocess or API call).
-5. **Implement `evaluate`** — run tests / diff against ground truth / grade with an LLM.
-6. **Customize `summarize`** — add benchmark-specific breakdowns in `metadata` (pass-by-category, dataset version, etc.).
-7. **Customize the CLI** — most of `src/cli.ts` stays the same; update flags for variant names specific to your benchmark.
-8. **Tag your repo** — `gh repo edit --add-topic nexus-agents-eval` so `ECOSYSTEM.md` discovery works.
+Pro's per-instance cost is significant — each instance requires:
+- A repo clone (some Pro repos are large; expect 100MB+ each)
+- A solver invocation through your configured agent
+- A Docker container per instance for evaluation
 
-## Tips
-
-- **No HTTP server needed.** Adapters are libraries + CLIs. nexus-agents is a peer dependency; you don't need to run its MCP server to exercise the contract.
-- **Per-instance failures don't abort the run.** If one instance throws, `runBenchmark` records it in `summary.metadata.failureCount` and continues.
-- **Honor `ctx.signal`** in your `runInstance` so long runs can be cancelled.
-- **Put variants into `config` or the constructor**, not CLI flags passed through to every instance. Example: `new MyBenchAdapter({ variant: 'lite' })`.
-- **Keep pure evaluation separate from network calls.** Makes the tests reproducible and fast.
-
-## Existing benchmarks using this pattern
-
-- [nexus-eval-swebench](https://github.com/williamzujkowski/nexus-eval-swebench) — SWE-bench Lite/Verified/Full (extraction tracked by nexus-agents #1962)
-
-## Ecosystem
-
-See [nexus-agents ECOSYSTEM.md](https://github.com/williamzujkowski/nexus-agents/blob/main/ECOSYSTEM.md) for the full registry.
+A full 731-instance sweep is operationally non-trivial. Start with `--limit 5` for smoke, then `--limit 25` for a meaningful slice, before committing to a full run. Per-language slices (`--languages python,go`) are useful for diagnosing routing decisions.
 
 ## License
 

@@ -3,23 +3,23 @@
  * Template CLI. Customize for your benchmark.
  *
  * Usage:
- *   nexus-eval-BENCHMARK run [--variant lite] [--limit N] [--concurrency N]
- *   nexus-eval-BENCHMARK --json > results.json
- *   nexus-eval-BENCHMARK --help
+ *   nexus-eval-swebench-pro run [--variant lite] [--limit N] [--concurrency N]
+ *   nexus-eval-swebench-pro --json > results.json
+ *   nexus-eval-swebench-pro --help
  *
  * @module cli
  */
 
 import { parseArgs } from 'node:util';
 import { runBenchmark } from 'nexus-agents';
-import { TemplateBenchmarkAdapter } from './adapter.js';
+import { SweBenchProAdapter } from './adapter.js';
 
-const HELP = `nexus-eval-BENCHMARK — <replace with one-line description>
+const HELP = `nexus-eval-swebench-pro — SWE-bench Pro evaluation harness for nexus-agents
 
 Usage:
-  nexus-eval-BENCHMARK [run] [options]
-  nexus-eval-BENCHMARK --version
-  nexus-eval-BENCHMARK --help
+  nexus-eval-swebench-pro [run] [options]
+  nexus-eval-swebench-pro --version
+  nexus-eval-swebench-pro --help
 
 Options:
   --variant <name>      Benchmark variant (depends on your benchmark).
@@ -38,7 +38,7 @@ async function main(argv: readonly string[]): Promise<number> {
     return 0;
   }
   if (args.includes('--version') || args.includes('-v')) {
-    process.stdout.write('nexus-eval-BENCHMARK 0.0.1\n');
+    process.stdout.write('nexus-eval-swebench-pro 0.0.1\n');
     return 0;
   }
 
@@ -59,9 +59,12 @@ async function main(argv: readonly string[]): Promise<number> {
   const concurrency = Number(parsed.values.concurrency ?? '1');
   const timeoutMs = Number(parsed.values.timeout ?? '300000');
 
-  const adapter = new TemplateBenchmarkAdapter(
-    parsed.values.variant !== undefined ? { variant: parsed.values.variant } : {}
-  );
+  // SWE-bench Pro is one dataset in v1 (no Lite/Verified/Full split — those
+  // belong to the sibling `nexus-eval-swebench` repo). The --variant flag
+  // exists in the template CLI for symmetry with other harnesses; we accept
+  // it but don't currently route on it.
+  void parsed.values.variant;
+  const adapter = new SweBenchProAdapter();
 
   const summary = await runBenchmark(adapter, {}, {
     concurrency,
@@ -78,7 +81,7 @@ async function main(argv: readonly string[]): Promise<number> {
     process.stdout.write(JSON.stringify(summary, null, 2) + '\n');
   } else {
     process.stdout.write('\n');
-    process.stdout.write(`${adapter.name}${adapter.variant !== undefined ? ` (${adapter.variant})` : ''}\n`);
+    process.stdout.write(`${adapter.name}\n`);
     process.stdout.write(`  passed:  ${String(summary.passed)} / ${String(summary.total)}\n`);
     process.stdout.write(`  rate:    ${(summary.passRate * 100).toFixed(1)}%\n`);
     process.stdout.write(`  runtime: ${(summary.runTimeMs / 1000).toFixed(1)}s\n`);

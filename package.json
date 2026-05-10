@@ -1,12 +1,12 @@
 {
-  "name": "nexus-eval-BENCHMARK",
-  "version": "0.0.1",
-  "description": "TEMPLATE — Replace with: '<benchmark-name> evaluation harness for nexus-agents'",
+  "name": "nexus-eval-swebench-pro",
+  "version": "0.1.0",
+  "description": "SWE-bench Pro evaluation harness for nexus-agents (731 multi-language instances, ScaleAI/SWE-bench_Pro)",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "nexus-eval-BENCHMARK": "dist/cli.js"
+    "nexus-eval-swebench-pro": "dist/cli.js"
   },
   "scripts": {
     "build": "tsc",
@@ -20,7 +20,10 @@
     "nexus-agents",
     "nexus-agents-eval",
     "benchmark",
-    "evaluation"
+    "evaluation",
+    "swe-bench",
+    "swe-bench-pro",
+    "scale-ai"
   ],
   "author": "",
   "license": "MIT",

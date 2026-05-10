@@ -1,15 +1,15 @@
 /**
- * Library entry point. Exposes the adapter so other projects can
- * compose it into their own harnesses (e.g., a dashboard that runs
- * multiple benchmarks).
+ * Library entry point — exposes the SWE-bench Pro adapter for
+ * composition into other harnesses (dashboards, multi-benchmark runners,
+ * leaderboard tooling).
  *
  * @module index
  */
 
 export {
-  TemplateBenchmarkAdapter,
-  type BenchmarkInstance,
-  type BenchmarkPrediction,
-  type BenchmarkEvalResult,
-  type BenchmarkConfig,
+  SweBenchProAdapter,
+  type SweBenchProInstance,
+  type SweBenchProPrediction,
+  type SweBenchProEvalResult,
+  type SweBenchProConfig,
 } from './adapter.js';
