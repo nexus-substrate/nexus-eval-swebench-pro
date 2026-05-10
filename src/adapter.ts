@@ -27,7 +27,11 @@ import type {
   BenchmarkAdapter,
   BenchmarkRunContext,
   BenchmarkRunSummary,
+  IModelAdapter,
 } from 'nexus-agents';
+
+import { loadSweBenchProInstances } from './runner/instance-loader.js';
+import { generatePrediction } from './runner/agent-invoker.js';
 
 // ============================================================================
 // SWE-bench Pro instance / prediction / eval shapes
@@ -112,8 +116,13 @@ export interface SweBenchProConfig {
    */
   readonly languages?: ReadonlyArray<SweBenchProInstance['repoLanguage']>;
   /**
-   * Where the Docker harness is checked out / installed. Default:
-   * `~/.nexus-eval-swebench-pro/harness/`.
+   * Cache directory for HuggingFace dataset downloads. Default:
+   * `~/.nexus-eval-swebench-pro/cache/`.
+   */
+  readonly cacheDir?: string;
+  /**
+   * Where the Docker harness is checked out / installed. Reserved for
+   * v0.4 follow-up (Docker-eval integration).
    */
   readonly harnessPath?: string;
 }
@@ -131,78 +140,86 @@ export class SweBenchProAdapter
   // from the BenchmarkAdapter contract is left absent; future Pro-S /
   // Pro-XL slices (if Scale ships them) would set it here.
 
+  private readonly modelAdapter: IModelAdapter;
   private readonly config: SweBenchProConfig;
+  private readonly resultCache = new Map<string, SweBenchProEvalResult>();
 
-  constructor(config: SweBenchProConfig = {}) {
+  constructor(modelAdapter: IModelAdapter, config: SweBenchProConfig = {}) {
+    this.modelAdapter = modelAdapter;
     this.config = config;
   }
 
   /**
-   * Load the Pro instance set. v0 returns the bundled fixture (10
-   * instances) so the harness scaffold is exercisable without network.
-   * Real HuggingFace + `.jsonl` loaders ship in follow-up PRs (see
-   * IMPLEMENTATION.md item 1).
+   * Load Pro instances from the configured source (HuggingFace by
+   * default, or a `.jsonl` fixture path, or the bundled fixture).
    */
   loadInstances(_runConfig: Record<string, unknown>): Promise<readonly SweBenchProInstance[]> {
-    // TODO(#1): implement HF / .jsonl loader.
-    // For v0, return a tiny synthetic fixture so smoke tests pass.
-    return Promise.resolve([
-      {
-        instanceId: 'fixture__001',
-        repo: 'example/repo',
-        baseCommit: '0000000000000000000000000000000000000000',
-        problemStatement: 'Stub problem — replace with real Pro instance loader.',
-        repoLanguage: 'python',
-        requirements: '- Function returns "ok" when given valid input.',
-        interface: 'def solve(x: str) -> str: ...',
-      },
-    ]);
-  }
-
-  /**
-   * Run the agent on one Pro instance. v0 returns a stub patch so the
-   * eval-harness wiring can be exercised end-to-end. Real runner ships
-   * in follow-up PRs (see IMPLEMENTATION.md item 2).
-   *
-   * The runner needs to:
-   *   - Compose a prompt that includes `instance.requirements` +
-   *     `instance.interface` + `instance.problemStatement`
-   *   - Invoke an agent (Claude / Codex / Gemini / OpenCode) inside a
-   *     workspace cloned at `instance.baseCommit`
-   *   - Capture the resulting patch text + a meaningful `prefix`
-   */
-  runInstance(
-    instance: SweBenchProInstance,
-    ctx: BenchmarkRunContext
-  ): Promise<SweBenchProPrediction> {
-    // TODO(#2): wire to a real solver.
-    void ctx;
-    const start = performance.now();
-    return Promise.resolve({
-      instanceId: instance.instanceId,
-      patch: '',
-      prefix: '',
-      durationMs: Math.round(performance.now() - start),
+    return loadSweBenchProInstances({
+      ...(this.config.dataset !== undefined && { source: this.config.dataset }),
+      ...(this.config.languages !== undefined && { languages: this.config.languages }),
+      ...(this.config.cacheDir !== undefined && { cacheDir: this.config.cacheDir }),
     });
   }
 
   /**
-   * Evaluate a Pro prediction. v0 marks any non-empty patch as a pass
-   * so the smoke test runs. Real evaluation ships in follow-up PRs
-   * (see IMPLEMENTATION.md item 4) and shells out to
-   * `scaleapi/SWE-bench_Pro-os` via Docker.
+   * Run the model on one Pro instance. v0.2: model-only baseline —
+   * sends problem_statement + requirements + interface to the model
+   * and parses out a unified-diff patch + prefix string. No agent
+   * loop, no workspace clone, no Docker eval. v0.3 follow-up adds
+   * agentic flow via ICliAdapter.
+   */
+  async runInstance(
+    instance: SweBenchProInstance,
+    ctx: BenchmarkRunContext
+  ): Promise<SweBenchProPrediction> {
+    void ctx;
+    const result = await generatePrediction(instance, this.modelAdapter);
+
+    if (!result.ok) {
+      const empty: SweBenchProPrediction = {
+        instanceId: instance.instanceId,
+        patch: '',
+        prefix: '',
+        durationMs: 0,
+      };
+      this.resultCache.set(instance.instanceId, {
+        instanceId: instance.instanceId,
+        passed: false,
+        repoLanguage: instance.repoLanguage,
+        reason: result.error.message,
+      });
+      return empty;
+    }
+
+    this.resultCache.set(instance.instanceId, {
+      instanceId: instance.instanceId,
+      passed: result.value.patch.length > 0,
+      repoLanguage: instance.repoLanguage,
+      ...(result.value.patch.length === 0 && {
+        reason: 'model returned no patch',
+      }),
+    });
+    return result.value;
+  }
+
+  /**
+   * Evaluate a Pro prediction. v0.2: returns the verdict captured
+   * during runInstance. Test-based pass/fail (Docker harness) is v0.4
+   * follow-up.
    */
   evaluate(
     instance: SweBenchProInstance,
     prediction: SweBenchProPrediction
   ): Promise<SweBenchProEvalResult> {
-    // TODO(#4): wire to scaleapi/SWE-bench_Pro-os via Docker.
+    const cached = this.resultCache.get(instance.instanceId);
+    if (cached !== undefined) return Promise.resolve(cached);
+    // Defensive fallback if evaluate() is ever called without runInstance.
     const passed = prediction.patch.length > 0;
     return Promise.resolve({
       instanceId: instance.instanceId,
       passed,
       repoLanguage: instance.repoLanguage,
-      ...(passed ? {} : { reason: 'stub evaluator: non-empty patch required' }),
+      ...(passed ? {} : { reason: 'evaluate() called without runInstance' }),
     });
   }
 
