@@ -1,6 +1,6 @@
 {
   "name": "nexus-eval-swebench-pro",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "SWE-bench Pro evaluation harness for nexus-agents (731 multi-language instances, ScaleAI/SWE-bench_Pro)",
   "type": "module",
   "main": "dist/index.js",
