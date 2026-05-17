@@ -1,6 +1,6 @@
 # nexus-eval-swebench-pro
 
-SWE-bench **Pro** evaluation harness for [nexus-agents](https://github.com/williamzujkowski/nexus-agents) — implements the `BenchmarkAdapter` contract from nexus-agents ≥ 2.33.1.
+SWE-bench **Pro** evaluation harness for [nexus-agents](https://github.com/nexus-substrate/nexus-agents) — implements the `BenchmarkAdapter` contract from nexus-agents ≥ 2.33.1.
 
 > **Status**: v0.2 model-only baseline. Real HuggingFace dataset loader, Pro-specific prompt + patch+prefix extractor, and IModelAdapter-driven runner all wired up. Docker eval (test-based pass/fail) is the v0.4 follow-up.
 
@@ -14,7 +14,7 @@ OpenAI and Anthropic both publicly signal that **SWE-bench Verified is largely c
 - **Newer dataset** with stronger contamination resistance than Verified
 - **Different prediction format** (`{instance_id, patch, prefix}`) and a different Docker eval harness (`scaleapi/SWE-bench_Pro-os`)
 
-This repo is the dedicated harness for running Pro evaluations through nexus-agents' orchestration. Per the [nexus-agents harness-extraction policy](https://github.com/williamzujkowski/nexus-agents/issues/2514) (originally [#1960](https://github.com/williamzujkowski/nexus-agents/issues/1960)), benchmarks live in standalone `nexus-eval-*` repos so they can evolve independently of the core.
+This repo is the dedicated harness for running Pro evaluations through nexus-agents' orchestration. Per the [nexus-agents harness-extraction policy](https://github.com/nexus-substrate/nexus-agents/issues/2514) (originally [#1960](https://github.com/nexus-substrate/nexus-agents/issues/1960)), benchmarks live in standalone `nexus-eval-*` repos so they can evolve independently of the core.
 
 ## Install
 
@@ -89,16 +89,16 @@ Operators with their own `IModelAdapter` (Claude API, Ollama, anything implement
 
 ### Shipped in v0.2
 
-- **[#2](https://github.com/williamzujkowski/nexus-eval-swebench-pro/issues/2) — Dataset loader** ✓ Real HuggingFace fetch from `ScaleAI/SWE-bench_Pro` with on-disk cache, plus `.jsonl` and bundled-fixture sources. Handles the `requirements` / `interface` / `repo_language` fields and the languages filter.
-- **[#3](https://github.com/williamzujkowski/nexus-eval-swebench-pro/issues/3) — Solver runner + Pro prompt** ✓ Model-only baseline: composes the Pro-specific prompt (problem + requirements + interface + language), invokes the configured `IModelAdapter`, parses out a unified-diff patch + prefix.
+- **[#2](https://github.com/nexus-substrate/nexus-eval-swebench-pro/issues/2) — Dataset loader** ✓ Real HuggingFace fetch from `ScaleAI/SWE-bench_Pro` with on-disk cache, plus `.jsonl` and bundled-fixture sources. Handles the `requirements` / `interface` / `repo_language` fields and the languages filter.
+- **[#3](https://github.com/nexus-substrate/nexus-eval-swebench-pro/issues/3) — Solver runner + Pro prompt** ✓ Model-only baseline: composes the Pro-specific prompt (problem + requirements + interface + language), invokes the configured `IModelAdapter`, parses out a unified-diff patch + prefix.
 
 ### Still to do
 
-- **[#4](https://github.com/williamzujkowski/nexus-eval-swebench-pro/issues/4) — Docker eval integration** with `scaleapi/SWE-bench_Pro-os`. Without it, the adapter's pass/fail = "model produced a non-empty patch". Run the upstream Docker harness on the emitted predictions for true test-based resolution.
-- **[#5](https://github.com/williamzujkowski/nexus-eval-swebench-pro/issues/5) — End-to-end smoke** against ≤5 real instances spanning all 4 languages.
+- **[#4](https://github.com/nexus-substrate/nexus-eval-swebench-pro/issues/4) — Docker eval integration** with `scaleapi/SWE-bench_Pro-os`. Without it, the adapter's pass/fail = "model produced a non-empty patch". Run the upstream Docker harness on the emitted predictions for true test-based resolution.
+- **[#5](https://github.com/nexus-substrate/nexus-eval-swebench-pro/issues/5) — End-to-end smoke** against ≤5 real instances spanning all 4 languages.
 - **v0.3 (TBD)** — agentic flow via `ICliAdapter` against a cloned workspace (substantially better patch quality than the model-only baseline).
 
-Cross-repo tracking lives at [nexus-agents #2513](https://github.com/williamzujkowski/nexus-agents/issues/2513) so anyone searching the main repo for "SWE-bench Pro" lands at this repo.
+Cross-repo tracking lives at [nexus-agents #2513](https://github.com/nexus-substrate/nexus-agents/issues/2513) so anyone searching the main repo for "SWE-bench Pro" lands at this repo.
 
 ## The contract
 
