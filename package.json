@@ -4,11 +4,11 @@
   "description": "SWE-bench Pro evaluation harness for nexus-agents (731 multi-language instances, ScaleAI/SWE-bench_Pro)",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/williamzujkowski/nexus-eval-swebench-pro.git"
+    "url": "git+https://github.com/nexus-substrate/nexus-eval-swebench-pro.git"
   },
-  "homepage": "https://github.com/williamzujkowski/nexus-eval-swebench-pro#readme",
+  "homepage": "https://github.com/nexus-substrate/nexus-eval-swebench-pro#readme",
   "bugs": {
-    "url": "https://github.com/williamzujkowski/nexus-eval-swebench-pro/issues"
+    "url": "https://github.com/nexus-substrate/nexus-eval-swebench-pro/issues"
   },
   "type": "module",
   "main": "dist/index.js",

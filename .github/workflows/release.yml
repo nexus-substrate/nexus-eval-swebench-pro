@@ -6,7 +6,7 @@ name: Release
 # Auth: npm trusted publishing via OIDC. No long-lived NPM_TOKEN required.
 # One-time setup on npm: Settings → Trusted Publishers → Add publisher
 #   - Publisher: GitHub Actions
-#   - Organization: williamzujkowski
+#   - Organization: nexus-substrate
 #   - Repository: nexus-eval-swebench-pro
 #   - Workflow filename: release.yml
 # After that, `id-token: write` + `npm publish --provenance` authenticates
