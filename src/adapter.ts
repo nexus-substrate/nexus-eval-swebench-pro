@@ -4,8 +4,8 @@
  * instances across 11 real-world repos).
  *
  * Differences from the existing `nexus-eval-swebench` (Lite/Verified/Full)
- * harness — these are the four implementation areas tracked in this repo's
- * `IMPLEMENTATION.md`:
+ * harness — these are the four implementation areas tracked under the
+ * README's "Implementation roadmap" section:
  *
  * 1. **Dataset format**: Pro adds `requirements`, `interface`, and
  *    `repo_language` fields not present in Lite/Verified.
@@ -107,8 +107,8 @@ export interface SweBenchProConfig {
    *     `ScaleAI/SWE-bench_Pro`.
    *   - Absolute path to a `.jsonl` fixture: load from disk (used in
    *     CI + reproducibility runs).
-   *   - `'fixture'`: load the bundled `fixtures/sample.jsonl` (10
-   *     instances) for smoke testing.
+   *   - `'fixture'`: load the bundled in-code fixture (4 instances, one
+   *     per language) for smoke testing.
    */
   readonly dataset?: 'huggingface' | 'fixture' | string;
   /**
@@ -172,8 +172,17 @@ export class SweBenchProAdapter
     instance: SweBenchProInstance,
     ctx: BenchmarkRunContext
   ): Promise<SweBenchProPrediction> {
-    void ctx;
-    const result = await generatePrediction(instance, this.modelAdapter);
+    // Thread the orchestrator's per-instance timeout (ultimately the
+    // `--timeout` CLI flag via `instanceTimeoutMs`) into the model call.
+    // Fall back to generatePrediction's own default only when the context
+    // supplies no usable budget.
+    const result = await generatePrediction(
+      instance,
+      this.modelAdapter,
+      typeof ctx.timeoutMs === 'number' && ctx.timeoutMs > 0
+        ? { timeoutMs: ctx.timeoutMs }
+        : {}
+    );
 
     if (!result.ok) {
       const empty: SweBenchProPrediction = {
